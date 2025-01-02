@@ -110,7 +110,7 @@
       const sponsorInfo = await fetchSponsorInfo();
 
       const fetchTableData = async () => {
-        if (!sponsorId) return alert("No sponsor ID provided in the URL.");
+        if (!sponsorId) return alert("Geçersiz Sponsor Numarası");
         const sponsorInfo = await fetchSponsorInfo();
         document.getElementById("sponsor-name").innerText = sponsorInfo[0].name;
 
