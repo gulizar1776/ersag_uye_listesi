@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kayıtlar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f9f9f9;
+        color: #333;
+      }
+
+      h1 {
+        margin: 20px 0;
+        font-size: 24px;
+        color: #444;
+      }
+
+      table {
+        width: 80%;
+        margin: 20px 0;
+        border-collapse: separate;
+        border-spacing: 0;
+        background-color: #fff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      thead {
+        background-color: #0073e6;
+        color: white;
+        text-transform: uppercase;
+      }
+
+      th,
+      td {
+        padding: 12px 15px;
+        text-align: left;
+        border-right: 1px solid #ddd;
+      }
+
+      th {
+        font-weight: bold;
+        font-size: 14px;
+      }
+
+      tbody tr:nth-child(odd) {
+        background-color: #f9f9f9;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #ffffff;
+      }
+
+      tbody tr:hover {
+        background-color: #e6f7ff;
+      }
+
+      td:last-child,
+      th:last-child {
+        border-right: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="sponsor-name">Yükleniyor...</h1>
+    <table>
+      <thead>
+        <tr id="table-headers"></tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <script type="module">
+      const secrets = {
+        sb_key:
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6I" +
+          "mJldnRweHdmbHhlemJ0dGFpdXB2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NDY1NjY" +
+          "sImV4cCI6MjA1MTIyMjU2Nn0.wyO7WvmHkjhIuQ4JGb1oMtX_lFMONvVU0ii8FOZAKvg",
+        sb_url: "https://bevtpxwflxezbttaiupv.supabase.co",
+        sb_auth: "c1ad6b16-4458-4f9c-88ef-968d3d929369"
+      };
+
+      const sb = supabase.createClient(secrets.sb_url, secrets.sb_key);
+
+      const params = new URLSearchParams(window.location.search);
+      const sponsorId = params.get("sponsor");
+
+      const columnMapping = {
+        full_name: "Ad Soyad",
+        tc: "TCKN",
+        phone_number: "Telefon Numarası",
+        address: "Adres"
+      };
+
+      async function fetchSponsorInfo() {
+        const { data, error } = await sb.from("sponsors").select("*").eq("id", sponsorId);
+        if (error || !data.length) console.error("Error fetching sponsor: ", sponsorId);
+        return data || null;
+      }
+
+      const sponsorInfo = await fetchSponsorInfo();
+
+      const fetchTableData = async () => {
+        if (!sponsorId) return alert("No sponsor ID provided in the URL.");
+        const sponsorInfo = await fetchSponsorInfo();
+        document.getElementById("sponsor-name").innerText = sponsorInfo[0].name;
+
+        const { data, error } = await sb
+          .from("submissions")
+          .select("full_name, tc, phone_number, address")
+          .eq("sponsor_id", sponsorId);
+
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        renderTable(data);
+      };
+
+      const sanitizePhoneNumber = number => {
+        let sanitizedNumber = number.replace(/[^0-9]/g, "");
+        console.log(sanitizedNumber);
+
+        if (sanitizedNumber.startsWith("0")) sanitizedNumber = sanitizedNumber.slice(1);
+        console.log(sanitizedNumber);
+
+        if (!sanitizedNumber.startsWith("90")) {
+          sanitizedNumber = "90" + sanitizedNumber;
+        }
+
+        console.log(sanitizedNumber);
+        return sanitizedNumber;
+      };
+
+      const renderTable = data => {
+        const headers = Object.keys(columnMapping);
+        const headerRow = headers.map(header => `<th>${columnMapping[header]}</th>`).join("");
+        document.getElementById("table-headers").innerHTML = headerRow;
+
+        const bodyRows = data
+          .map(row => {
+            const rowCells = headers.map(header => `<td>${row[header] || ""}</td>`).join("");
+            return `<tr>${rowCells}</tr>`;
+          })
+          .join("");
+        document.getElementById("table-body").innerHTML = bodyRows;
+      };
+
+      fetchTableData();
+    </script>
+  </body>
+</html>
