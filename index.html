@@ -96,7 +96,6 @@
 
       const columnMapping = {
         full_name: "Ad Soyad",
-        tc: "TCKN",
         phone_number: "Telefon Numarası",
         address: "Adres"
       };
@@ -116,7 +115,7 @@
 
         const { data, error } = await sb
           .from("submissions")
-          .select("full_name, tc, phone_number, address")
+          .select("full_name, phone_number, address")
           .eq("sponsor_id", sponsorId);
 
         if (error) {
