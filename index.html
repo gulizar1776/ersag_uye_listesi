@@ -7,50 +7,34 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
     <style>
       body {
-        font-family: Arial, sans-serif;
-        line-height: 1.6;
         margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        background-color: #f9f9f9;
-        color: #333;
+        min-height: 100vh;
+        display: block;
+        font-family: Arial, Helvetica, sans-serif;
       }
 
       h1 {
-        margin: 20px 0;
-        font-size: 24px;
-        color: #444;
+        text-align: center;
+        margin-top: 20px;
       }
 
       table {
         width: 80%;
-        margin: 20px 0;
-        border-collapse: separate;
-        border-spacing: 0;
-        background-color: #fff;
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-collapse: collapse;
+        margin: 20px auto;
       }
 
       thead {
         background-color: #0073e6;
         color: white;
-        text-transform: uppercase;
-      }
-
-      th,
-      td {
-        padding: 12px 15px;
-        text-align: left;
-        border-right: 1px solid #ddd;
       }
 
       th {
+        padding: 0.75rem 1rem;
+        text-align: left;
         font-weight: bold;
-        font-size: 14px;
+        font-size: 1rem;
+        border: 1px solid #ddd;
       }
 
       tbody tr:nth-child(odd) {
@@ -65,20 +49,55 @@
         background-color: #e6f7ff;
       }
 
-      td:last-child,
-      th:last-child {
-        border-right: none;
+      td {
+        padding: 0.625rem 1rem;
+        border: 1px solid #ddd;
+        text-align: left;
+      }
+
+      td:first-child input[type="checkbox"] {
+        width: 2rem;
+        height: 2rem;
+        cursor: pointer;
+      }
+
+      @media (max-width: 768px) {
+        table {
+          width: 100%;
+          font-size: 0.875rem;
+        }
+
+        th,
+        td {
+          padding: 0.625rem;
+        }
+
+        h1 {
+          font-size: 1.25rem;
+        }
+
+        .table-container {
+          overflow-x: auto;
+          width: 100%;
+        }
+      }
+
+      tbody tr.handled {
+        opacity: 0.5;
+        background-color: #e0e0e0;
       }
     </style>
   </head>
   <body>
-    <h1 id="sponsor-name">Yükleniyor...</h1>
-    <table>
-      <thead>
-        <tr id="table-headers"></tr>
-      </thead>
-      <tbody id="table-body"></tbody>
-    </table>
+    <h1 id="sponsor-name"></h1>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr id="table-headers"></tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
     <script type="module">
       const secrets = {
         sb_key:
@@ -97,7 +116,8 @@
       const columnMapping = {
         full_name: "Ad Soyad",
         phone_number: "Telefon Numarası",
-        address: "Adres"
+        address: "Adres",
+        date: "Tarih"
       };
 
       async function fetchSponsorInfo() {
@@ -109,50 +129,100 @@
       const sponsorInfo = await fetchSponsorInfo();
 
       const fetchTableData = async () => {
-        if (!sponsorId) return alert("Geçersiz Sponsor Numarası");
+        if (!sponsorId) return alert("Geçersiz Sponsor No");
         const sponsorInfo = await fetchSponsorInfo();
-        document.getElementById("sponsor-name").innerText = sponsorInfo[0].name;
+        document.getElementById("sponsor-name").innerText = `${sponsorId} - ${sponsorInfo[0].name}`;
 
         const { data, error } = await sb
           .from("submissions")
-          .select("full_name, phone_number, address")
-          .eq("sponsor_id", sponsorId);
+          .select("id, full_name, phone_number, address, date, is_handled")
+          .eq("sponsor_id", sponsorId)
+          .order("date", { ascending: false });
 
-        if (error) {
-          console.error(error);
-          return;
-        }
+        if (error) return console.error(error);
 
         renderTable(data);
       };
 
       const sanitizePhoneNumber = number => {
         let sanitizedNumber = number.replace(/[^0-9]/g, "");
-        console.log(sanitizedNumber);
-
         if (sanitizedNumber.startsWith("0")) sanitizedNumber = sanitizedNumber.slice(1);
-        console.log(sanitizedNumber);
-
-        if (!sanitizedNumber.startsWith("90")) {
-          sanitizedNumber = "90" + sanitizedNumber;
-        }
-
-        console.log(sanitizedNumber);
+        if (!sanitizedNumber.startsWith("90")) sanitizedNumber = "90" + sanitizedNumber;
         return sanitizedNumber;
       };
 
+      const formatDate = dateStr => {
+        const date = new Date(dateStr);
+        const dd = String(date.getDate()).padStart(2, "0");
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const yyyy = date.getFullYear();
+        const hh = String(date.getHours()).padStart(2, "0");
+        const min = String(date.getMinutes()).padStart(2, "0");
+        return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+      };
+
+      const attachCheckboxHandlers = () => {
+        const checkboxes = document.querySelectorAll(".handle-checkbox");
+        checkboxes.forEach(checkbox => {
+          checkbox.addEventListener("change", async event => {
+            const submissionId = event.target.dataset.id;
+            const row = event.target.closest("tr");
+
+            if (event.target.checked) {
+              try {
+                const { data, error } = await sb
+                  .from("submissions")
+                  .update({ is_handled: true })
+                  .eq("id", submissionId);
+
+                if (error) {
+                  console.error("Failed to update is_handled:", error);
+                  event.target.checked = false;
+                } else {
+                  event.target.disabled = true;
+                  event.target.classList.add("handled");
+
+                  row.classList.add("handled");
+                }
+              } catch (err) {
+                console.error("Unexpected error:", err);
+                event.target.checked = false;
+              }
+            }
+          });
+        });
+      };
+
       const renderTable = data => {
-        const headers = Object.keys(columnMapping);
-        const headerRow = headers.map(header => `<th>${columnMapping[header]}</th>`).join("");
+        const headers = ["", ...Object.keys(columnMapping)];
+        const headerRow = headers
+          .map((header, index) => (index === 0 ? `<th>İşlendi</th>` : `<th>${columnMapping[header]}</th>`))
+          .join("");
         document.getElementById("table-headers").innerHTML = headerRow;
 
         const bodyRows = data
           .map(row => {
-            const rowCells = headers.map(header => `<td>${row[header] || ""}</td>`).join("");
-            return `<tr>${rowCells}</tr>`;
+            const rowCells = [
+              `<td><input type="checkbox" class="handle-checkbox" data-id="${row.id}" ${
+                row.is_handled ? "checked disabled" : ""
+              } /></td>`,
+              ...Object.keys(columnMapping).map(header => {
+                if (header === "date" && row[header]) {
+                  return `<td>${formatDate(row[header])}</td>`;
+                } else if (header === "phone_number" && row[header]) {
+                  return `<td>+${sanitizePhoneNumber(row[header])}</td>`;
+                }
+                return `<td>${row[header] || ""}</td>`;
+              })
+            ].join("");
+            const rowClass = row.is_handled ? "handled" : "";
+
+            return `<tr class="${rowClass}">${rowCells}</tr>`;
           })
           .join("");
         document.getElementById("table-body").innerHTML = bodyRows;
+
+        attachCheckboxHandlers();
       };
 
       fetchTableData();
